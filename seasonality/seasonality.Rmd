@@ -1,0 +1,90 @@
+---
+title: "Seasonality"
+author: "Andrei Pazniak"
+date: "2/2/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+source("..\\common\\DownloadQuotes.R")
+
+library(lubridate)
+library(zoo)
+library(ggplot2)
+library(data.table)
+library(foreach)
+library(tidyquant)
+library(PerformanceAnalytics)
+```
+
+```{r constants, include=FALSE}
+SYMBOL <- "XAUUSD"
+START_YEAR <- 2000
+END_YEAR <- 2020
+WINDOW_SIZE <- 20
+CLUSTER_SIZE <- 4
+```
+
+## Analyses for symbol `r SYMBOL`
+### Download and tranform daily data to relative form openDailyPriceToday / openDailyPriceYesterday
+```{r download, echo=FALSE}
+GetNormalizeData <- function (symbol = "SBUX", year=2019){
+  d <- GetQuotes(symbol, startDate=ISOdate(year, 1, 1, tz = "UTC"), endDate=ISOdate(year+1, 1, 1, tz = "UTC"), periodicity="D1", type="Bids")
+  d[,day := lubridate::yday(datetime)]
+  d <- d[,.(day, rateOpen=open / shift(open))]
+  setkey(d, day)
+  d <- d[CJ(1:366)]
+  #setnafill(d, type="locf")
+  d[is.na(rateOpen), rateOpen := 1]
+  d
+}
+r<- foreach(year=START_YEAR:END_YEAR, .combine=rbind) %do% {
+  d<-GetNormalizeData("XAUUSD", year)
+  d[,year:=year]
+  d
+}
+##ggplot(r, aes(x=day, y=rateOpen, group=year, color=year)) + geom_ma()
+ggplot(r, aes(x=year, y=rateOpen, group=year)) + geom_boxplot()
+```
+
+### Geom moving average for last `r WINDOW_SIZE` days
+```{r geometric}
+#geom moving average for each year
+m <- r[,.(day,mva=frollapply(rateOpen, WINDOW_SIZE, mean.geometric)), by=year]
+ggplot(m, aes(x=day, y=mva, group=year, color=year)) + geom_line()
+```
+
+### Cluster it with size = `r CLUSTER_SIZE`
+```{r}
+wide <- dcast(m, year ~ day, value.var = "mva")
+wide_data <- wide[,-1:-20]
+means_data <- kmeans(wide_data, CLUSTER_SIZE)
+
+split(wide$year, means_data$cluster)
+```
+### Plot cluster centers. Width of the line is power/size of cluster.
+```{r fig.width=15}
+centers <- as.data.table(means_data$centers)
+centers [,clusterIndex:= seq_len(.N)]
+centers[,clusterPower:=means_data$size/sum(means_data$size)]
+
+cTable <- melt(centers, id.vars = c("clusterIndex", "clusterPower"))
+cTable[,day := as.numeric(variable) ]
+cTable[,variable:=NULL]
+ggplot(cTable, aes(x=day, y=value, group=clusterIndex, color=clusterIndex, size=clusterPower)) + geom_line()
+```
+
+### Plot geom average for all years 
+```{r}
+m2 <- m[,.(mva=mean.geometric(mva)), by=day]
+ggplot(m2, aes(x=day, y=mva)) + geom_line()
+```
+
+### Plot cummulative geom average 
+```{r}
+m2[is.na(mva), mva:=1]
+m2[,cum_mva:= cumprod(mva)]
+ggplot(m2, aes(x=day, y=cum_mva)) + geom_line()
+```
