@@ -1,0 +1,52 @@
+---
+title: "Portfolio Percent"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r echo=FALSE}
+library(data.table)
+library(RTTWebClient)
+library(ggplot2)
+```
+
+```{r}
+rawData <- fread("currentStock.csv")
+publicClient <- InitRTTWebApiHost(server = "ttlivewebapi.fxopen.com")
+quotes <- publicClient$GetCurrentQuotes()
+quotes[Symbol=="FB", Symbol:="META"]
+
+d <- merge(rawData, quotes, by.x = "Ticker", by.y = "Symbol", all.x = TRUE)
+if (d[is.na(BidPrice), .N] > 1)
+  stop( paste0("Cannot find price for ", d[is.na(BidPrice), Ticker], ". "))
+
+equity <- d[Ticker=="CASH", requiredDist]
+
+stockReal <- fread("currentStockTemp.csv")
+d<- merge(d, stockReal, all.x = TRUE)
+
+```
+
+###Differences real from required distribution
+```{r Differences real from required distribution}
+d[,realDist:=realStockNumber*(BidPrice + AskPrice)/2/equity * 100 ]
+d[,distDiff := requiredDist - realDist]
+d[,.(Ticker, requiredDist, realDist, distDiff)]
+```
+
+### For Equity - `r equity`
+```{r Required changes in StockNumber}
+d[complete.cases(d),requiredStocksNumber:=round(equity*requiredDist/100 /(BidPrice + AskPrice)*2)]
+d[Ticker=="CASH", requiredStocksNumber:= round(equity*(100-d[Ticker!="CASH", sum(requiredDist)])/100)]
+d[Ticker=="CASH", requiredDist:= round(requiredStocksNumber / equity*100) ]
+d[,.(Ticker, requiredDist, requiredStocksNumber, ActionToEquillibrium=requiredStocksNumber - realStockNumber)]
+```
+
+```{r}
+ggplot(d, aes(x="", y=requiredDist, fill=Ticker)) + 
+  geom_col(color = "black") +
+  geom_text(aes(label = Ticker), position = position_stack(vjust = 0.5)) +
+  coord_polar(theta = "y")
+
+```

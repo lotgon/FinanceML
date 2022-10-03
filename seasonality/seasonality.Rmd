@@ -20,11 +20,11 @@ library(PerformanceAnalytics)
 ```
 
 ```{r constants, include=FALSE}
-SYMBOL <- "XAUUSD"
+SYMBOL <- "WMB"
 START_YEAR <- 2000
 END_YEAR <- 2020
 WINDOW_SIZE <- 10
-CLUSTER_SIZE <- 5
+CLUSTER_SIZE <- 3
 ```
 
 ## Analyses for symbol `r SYMBOL`
@@ -66,7 +66,7 @@ means_data <- kmeans(wide_data, CLUSTER_SIZE)
 
 split(wide$year, means_data$cluster)
 ```
-### Plot cluster centers. Width of the line is power/size of cluster.
+### Plot cluster centers.
 ```{r fig.width=20, fig.height=15}
 centers <- as.data.table(means_data$centers)
 centers [,clusterIndex:= seq_len(.N)]
@@ -83,6 +83,16 @@ ggplot() + geom_line(data=cTable, aes(x=day, y=value)) + geom_hline(yintercept =
 m2 <- m[year <= END_YEAR,.(mva=mean.geometric(mva)), by=day]
 m2_curr_year <- m[year > END_YEAR,]
 ggplot() + geom_line(data=m2, aes(x=day, y=mva)) + geom_line(data=m2_curr_year, aes(x=day, y=mva), color="red")
+```
+```{r test}
+g <- m2[, is_positive := mva >=1]
+g<- g[,.(startDay=first(day), lastDay=last(day), area=sum(mva-1)), by=.(is_positive, rleid(is_positive))]
+g[, duration:= lastDay - startDay+1]
+g <- g[abs(area) > 0.01,]
+
+first_date <- floor_date(today("GMT"), unit="year")
+g[, start:= first_date + startDay-1]
+g[, last:= first_date + lastDay-1]
 ```
 
 ### Plot cummulative geom average 

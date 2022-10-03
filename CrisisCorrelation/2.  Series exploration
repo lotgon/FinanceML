@@ -1,0 +1,18 @@
+---
+title: "2. Series exploration"
+author: "Andrei Pazniak"
+date: "2022-09-29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r init, echo=FALSE, include=FALSE}
+library(data.table);library(ggplot2)
+source("..\\common\\QuantMod.R")
+source("..\\common\\fredRDownloader.R")
+source("..\\common\\QuotesTransform.R")
+source("..\\common\\localStorage.R")
+```

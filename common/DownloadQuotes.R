@@ -1,5 +1,4 @@
 require(data.table)
-require(rTTRatesHistory)
 require(lubridate)
 
 DownloadBars <- function(symbol, startDate, endDate, periodicity, type){
@@ -16,6 +15,9 @@ DownloadBars <- function(symbol, startDate, endDate, periodicity, type){
 
 #GetQuotes("EURCHF", startDate=ISOdate(2019, 1, 1, tz = "UTC"), endDate=ISOdate(2020, 1, 1, tz = "UTC"), periodicity="M1", type="BidAsk")
 GetQuotes <- function(symbol, startDate=ISOdate(2019, 1, 1, tz = "UTC"), endDate=ISOdate(2020, 1, 1, tz = "UTC"), periodicity="M1", type="Asks"){
+  if( endDate > now(tzone="GMT") + 1 )
+    endDate <- now(tzone="GMT") + 1
+  
   if( type == "BidAsk"){
     asks <- GetQuotes(symbol, startDate, endDate, periodicity, "Asks")
     bids <- GetQuotes(symbol, startDate, endDate, periodicity, "Bids")
@@ -26,7 +28,7 @@ GetQuotes <- function(symbol, startDate=ISOdate(2019, 1, 1, tz = "UTC"), endDate
     DownloadBars(symbol, startDate, endDate, periodicity, type)
   }
   d <- fread(qdFileName, col.names = c("datetime", "open", "close", "low", "high", "volume"))
-  d[,datetime:=ymd_hms(datetime)]
+  d[,datetime:=ymd(datetime)]
   return(d)
 }
 

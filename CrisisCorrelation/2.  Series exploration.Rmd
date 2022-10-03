@@ -1,0 +1,69 @@
+---
+title: "2. Series exploration"
+author: "Andrei Pazniak"
+date: "2022-09-29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r init, echo=FALSE, include=FALSE}
+library(data.table);library(ggplot2)
+source("..\\common\\QuotesTransform.R")
+
+data <- fread("cleanedSeries.csv")
+targetName <- "XAUUSD"
+```
+
+
+We want to predict future y with current regressor x. Simulating basic examples and using cross correlation function.
+```{r}
+set.seed(111)
+x1<-frollsum(rnorm(100), 10)
+y1 <- shift(x1, 10, type="lag")^3  # y1[i+10] = x1[i]^3 - we can predict the future with x
+
+ccf(y1, x1, lag.max = 75, na.action = na.pass)
+```
+
+
+# Analysing series for `r `targetName`
+
+Cross correlation will be the first exploration. Just some notes for analysing:
+- If correlation high/low for lag > 0, it means predictor forecast `target` for "Lag" days. `targetName` will change to the same side as predictor if corr is high (or opposite side if predictor is negative low)
+- If correlation high/low for lag < 0, consider to exchange target and regressor variable.
+```{r example}
+scale_max_value <- data[series_id==targetName][.N, value]
+data[type=="Price/USD", y := Scale_Max(m2adjusted_value, scale_max_value), by=series_id]
+data[type=="USA Economic/Percent", y := Scale_Max(value, scale_max_value), by=series_id]
+
+for(curr_id in unique(data$series_id))
+  ccf(data[series_id==targetName, y], data[series_id==curr_id, y], lag.max=6000, na.action=na.pass, main=curr_id)
+```
+
+
+
+
+correlation
+```{r}
+#d<-rbind(sp500[,.(date, series_id, value=growthIndex)], fed_ii)
+#d[series_id=="^GSPC", value:=value*10]
+#cor( sp500[series_id=="^GSPC", m2adjusted_value], econ_parameters[series_id=="FEDFUNDS", #value], #use="complete.obs")
+#cor( sp500[series_id=="^GSPC", m2adjusted_value], econ_parameters[series_id=="UNRATE", #value], #use="complete.obs")
+#cor( econ_parameters[series_id=="FEDFUNDS", value], econ_parameters[series_id=="UNRATE", value], #use="complete.obs")
+#ccf(econ_parameters[series_id=="FEDFUNDS", value], econ_parameters[series_id=="UNRATE", value])
+#ccf(econ_parameters[series_id=="FEDFUNDS", value], econ_parameters[series_id=="T10Y2Y", value], #lag.max=6000, na.action=na.pass)
+
+
+#scale to latest sp500 value
+
+#acf(econ_parameters[series_id=="UNRATE", value], lag.max = 20000)
+```
+
+Linear regresion
+```{r lr}
+#lm( sp500[series_id=="XAUUSD", m2adjusted_value]~ econ_parameters[series_id=="FEDFUNDS", value] + #econ_parameters[series_id=="UNRATE", value] + econ_parameters[series_id=="T10Y2Y", value])
+
+```
+

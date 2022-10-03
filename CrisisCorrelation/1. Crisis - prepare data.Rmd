@@ -1,0 +1,126 @@
+---
+title: "Crisis regressor"
+author: "Andrei Pazniak"
+date: "2022-09-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r init, echo=FALSE, include=FALSE}
+library(data.table);library(ggplot2)
+source("..\\common\\QuantMod.R")
+source("..\\common\\fredRDownloader.R")
+source("..\\common\\QuotesTransform.R")
+source("..\\common\\localStorage.R")
+```
+
+
+# Downloading target data.
+Our target value will be SP500 and GOLD. Data downloaded from Yahoo API.
+```{r sp500}
+observation_start = as.Date("1959-01-01")
+observation_end = as.Date("2022-09-26")#Sys.Date()
+
+sp500 <- qmod_getSeries("^GSPC", observation_start, observation_end)
+xau <- localStorage_getSeries("XAUUSD", observation_start, observation_end)
+
+data <- rbind(sp500, xau)
+data[,type:="Price/USD"]
+```
+
+# Econometrics
+Now, Lets find out which economic regressor that are most important on SP500.
+All common regressor are downloaded from great resource fredr.
+```{r}
+fed_ii <- fred_getSeries("FEDFUNDS", observation_start, observation_end)
+unemployment_rate <- fred_getSeries("UNRATE", observation_start, observation_end)
+T10Y2Y <- fred_getSeries("T10Y2Y", observation_start, observation_end)
+T10Y2Y[,value:=value + abs(min(value, na.rm = TRUE)) + 0.0001]
+
+econ_parameters <- rbind(unemployment_rate, fed_ii, T10Y2Y)
+econ_parameters[,date:=as.Date(date)]
+econ_parameters[,type:="USA Economic/Percent"]
+ggplot(data = econ_parameters, mapping = aes(x = date, y = value, color = series_id)) +
+    geom_line() + labs(x = "Observation Date", y = "Rate", color = "Series")
+```
+#Bind to one table 
+```{r}
+data <- rbind(data, econ_parameters)
+```
+# Inflation adjusted price.
+We want to see data for decades. However, average inflation is 5-7 percent annualy. 
+It means that 50 years ago price was `r round(1.06^50)` less. We can not compare data on one chart, so we have to ajust it by inflation.
+
+## First approach 
+To find best inflation coefficient, we have to find minimum of 
+adj_price = sp500_price*((1+rate)^(1/365))^(.N:1)
+f(sp500_price, rate) = max(adj_price) - min(adj_price).
+Best value for sp500 is 5.3.
+```{r inflation_adjusted_price}
+#next lines can be used to find best rate
+#sp500[,adjustedValue:=value*((1+rate)^(1/365))^(.N:1)]
+#sp500[!is.na(adjustedValue),max(adjustedValue) - min(adjustedValue)]
+rate <- 0.053
+data[,adjustedValue:=value*((1+rate)^(1/365))^(.N:1),by=series_id]
+ggplot(data[series_id=="^GSPC"])  + geom_line(aes(x=date, y=adjustedValue), color='green')+ geom_line(aes(x=date, y=value), color='blue')
+```
+
+## Second approach
+However, in real life, inflation rate is not constant yearly. Lets try another adjustment based on M2.
+```{r Price_M2}
+m2 <- fred_getSeries("M2SL", observation_start, observation_end)
+stopifnot( data[series_id=="^GSPC", date] == m2$date )
+data[, m2adjusted_value:=value/m2$value*m2[.N, value], by=series_id]
+ggplot(data[series_id=="^GSPC"])  + geom_line(aes(x=date, y=m2adjusted_value), color='blue')+ geom_line(aes(x=date, y=adjustedValue), color='green')
+
+```
+
+## Third approach
+To avoid inflation noise and normalizing, we will tranform SP500 rates to dropdawns from previous best maximum. It is standard approach. But, we will add some information about how much growth we have from last previous maximum. Local maximum will change only when dropdown > 20%.
+
+```{r}
+#to observe period and magnitude of crisises we tranform price to drawdowns
+data <- TranformToDropdawnData(data)
+#calculate growthRate and Growth Index
+#drawdown shows only decline, to see the full picture, use growthIndex. 
+CalculateLastMax(data)
+#Sharp decline on the chart, shows drawdown 15% of latest maximum
+ggplot(data[series_id=="^GSPC"]) +
+    geom_line(mapping = aes(x = date, y = dropdawnMVA), color = "green") + 
+    geom_line(mapping = aes(x = date, y = growthIndex), color = "purple") 
+
+```
+
+```{r}
+scale_max_value <- data[type=="USA Economic/Percent", max(value, na.rm = T)]
+chart_data <- rbind(
+  data[type=="Price/USD", .(x = date, y = Scale_Max(m2adjusted_value, scale_max_value)), by=series_id], 
+  data[type=="USA Economic/Percent", .(x = date, y = value), by=series_id]) 
+
+ggplot(chart_data, mapping = aes(x = x, y = y, color = series_id)) +
+    geom_line() + labs(x = "Observation Date", y = "Rate", color = "Series")
+```
+
+# TODO  - diff from percent/dollars/pips from ma200
+
+## Saving Data
+We save our final cleaned result to file. Next document will explore the data.
+```{r flushing}
+fwrite(data, "cleanedSeries.csv")
+```
+
+## Example of using data. 
+We Scale the data and cross correlate SP500 and GOLD(XAUUSD)
+```{r example}
+data <- fread("cleanedSeries.csv")
+
+scale_max_value <- data[series_id=="^GSPC"][.N, value]
+data[type=="Price/USD", y := Scale_Max(m2adjusted_value, scale_max_value), by=series_id]
+data[type=="USA Economic/Percent", y := Scale_Max(value, scale_max_value), by=series_id]
+ccf(data[series_id=="^GSPC", y], data[series_id=="XAUUSD", y], lag.max=6000, na.action=na.pass)
+
+```
+

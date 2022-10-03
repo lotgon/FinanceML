@@ -1,0 +1,87 @@
+---
+title: "R Notebook"
+author: "Andrei Pazniak"
+date: "3/22/2021"
+output: html_notebook
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+source("..\\common\\DownloadQuotes.R")
+source("Financial.R")
+
+library(lubridate)
+library(zoo)
+library(ggplot2)
+library(data.table)
+library(foreach)
+library(tidyquant)
+library(PerformanceAnalytics)
+library(RTTWebClient)
+```
+
+```{r constants, include=FALSE}
+WINDOW_SIZE <- 10
+SERVER_NAME <- "ttlivewebapi.fxopen.com"
+```
+
+## Getting all symbols
+```{r Symbols, echo=FALSE}
+publicClient <- InitPublicWebClient(server = "ttlivewebapi.fxopen.com")
+symbols <- publicClient$GetSymbolsInfoFromWeb()
+symbols <- symbols[!Symbol %like% "_L"]
+
+symbolStockNames <- symbols[SecurityName %like% "Stocks", Symbol]
+```
+There are `r symbols[,.N]` symbols. 
+
+```{r}
+GetNormalizeData <- function (symbol = "EURUSD", year=2019){
+  d <- GetQuotes(symbol, startDate=ISOdate(year, 1, 1, tz = "UTC"), endDate=ISOdate(year+1, 1, 1, tz = "UTC"), periodicity="D1", type="Bids")
+  d[,day := lubridate::yday(datetime)]
+  d <- d[,.(day, rateOpen=open / shift(open))]
+  setkey(d, day)
+  d <- d[CJ(1:366)]
+  d[is.na(rateOpen), rateOpen := 1]
+  d
+}
+GetSignificantMovement <- function(symbol, years){
+  r<- foreach(year=years, .combine=rbind) %do% {
+    d<-GetNormalizeData(symbol, year)
+    d[,year:=year]
+    d
+  }
+  m <- r[,.(day,mva=frollapply(rateOpen, WINDOW_SIZE, mean.geometric)), by=year] 
+  m2 <- m[,.(mva=mean.geometric(mva)), by=day]
+  g <- m2[, is_positive := mva >=1]
+  g<- g[,.(startDay=first(day), lastDay=last(day), area=sum(mva-1)), by=.(is_positive, rleid(is_positive))]
+  g[, duration:= lastDay - startDay+1]
+  g <- g[abs(area) > 0.01,]
+  
+  first_date <- floor_date(today("GMT"), unit="year")
+  g[, start:= first_date + startDay-1]
+  g[, last:= first_date + lastDay-1]
+  g[,symbol:=symbol]
+  g
+}
+
+years <- (2000:2020)#[-17]
+all <- foreach(symbol=symbols[,Symbol], .combine=rbind) %do% {
+  GetSignificantMovement(symbol, years)
+}
+all_expanded<- foreach(i=seq(1,all[,.N]), .combine = rbind ) %do% 
+  all[i,.(day=seq(startDay, lastDay), is_positive, area, symbol, lastDay)]
+
+current_day <- yday(today("GMT"))
+current_seasons <- all[startDay<=current_day & current_day < lastDay -10 ]
+
+```
+
+```{r tester}
+
+all[,ratio := DailyProfitRatio(symbol, 2016, startDay, lastDay, is_positive)]
+Reduce(`+`, all[!is.na(ratio) & symbol %in% symbolStockNames, ratio-1])
+plot(all[!is.na(ratio) & symbol %in% symbolStockNames][order(lastDay), cumsum(ratio-1)])
+```
