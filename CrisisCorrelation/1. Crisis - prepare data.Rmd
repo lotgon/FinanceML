@@ -22,12 +22,14 @@ source("..\\common\\localStorage.R")
 Our target value will be SP500 and GOLD. Data downloaded from Yahoo API.
 ```{r sp500}
 observation_start = as.Date("1959-01-01")
-observation_end = as.Date("2022-09-26")#Sys.Date()
+observation_end = Sys.Date()#as.Date("2022-11-25")
 
 sp500 <- qmod_getSeries("^GSPC", observation_start, observation_end)
+ndx <- qmod_getSeries("^NDX", observation_start, observation_end)
 xau <- localStorage_getSeries("XAUUSD", observation_start, observation_end)
+xbr <- localStorage_getSeries("XBRUSD", observation_start, observation_end)
 
-data <- rbind(sp500, xau)
+data <- rbind(sp500, xau, xbr, ndx)
 data[,type:="Price/USD"]
 ```
 
@@ -39,9 +41,15 @@ fed_ii <- fred_getSeries("FEDFUNDS", observation_start, observation_end)
 unemployment_rate <- fred_getSeries("UNRATE", observation_start, observation_end)
 T10Y2Y <- fred_getSeries("T10Y2Y", observation_start, observation_end)
 T10Y2Y[,value:=value + abs(min(value, na.rm = TRUE)) + 0.0001]
+inflation_rate <- fred_getSeries("FPCPITOTLZGUSA", observation_start, observation_end)
+bond10 <- fred_getSeries("IRLTLT01USM156N", observation_start, observation_end)
+dxy <- localStorage_getSeries("DXYUSD", observation_start, observation_end)
 
-econ_parameters <- rbind(unemployment_rate, fed_ii, T10Y2Y)
+
+econ_parameters <- rbind(unemployment_rate, fed_ii, T10Y2Y, inflation_rate, bond10)
 econ_parameters[,date:=as.Date(date)]
+econ_parameters <- rbind(econ_parameters, dxy)
+
 econ_parameters[,type:="USA Economic/Percent"]
 ggplot(data = econ_parameters, mapping = aes(x = date, y = value, color = series_id)) +
     geom_line() + labs(x = "Observation Date", y = "Rate", color = "Series")
@@ -64,8 +72,8 @@ Best value for sp500 is 5.3.
 #sp500[,adjustedValue:=value*((1+rate)^(1/365))^(.N:1)]
 #sp500[!is.na(adjustedValue),max(adjustedValue) - min(adjustedValue)]
 rate <- 0.053
-data[,adjustedValue:=value*((1+rate)^(1/365))^(.N:1),by=series_id]
-ggplot(data[series_id=="^GSPC"])  + geom_line(aes(x=date, y=adjustedValue), color='green')+ geom_line(aes(x=date, y=value), color='blue')
+data[,adjustedValue_constant:=value*((1+rate)^(1/365))^(.N:1),by=series_id]
+ggplot(data[series_id=="^GSPC"])  + geom_line(aes(x=date, y=adjustedValue_constant), color='green')+ geom_line(aes(x=date, y=value), color='blue')
 ```
 
 ## Second approach
@@ -73,8 +81,8 @@ However, in real life, inflation rate is not constant yearly. Lets try another a
 ```{r Price_M2}
 m2 <- fred_getSeries("M2SL", observation_start, observation_end)
 stopifnot( data[series_id=="^GSPC", date] == m2$date )
-data[, m2adjusted_value:=value/m2$value*m2[.N, value], by=series_id]
-ggplot(data[series_id=="^GSPC"])  + geom_line(aes(x=date, y=m2adjusted_value), color='blue')+ geom_line(aes(x=date, y=adjustedValue), color='green')
+data[, adjusted_value_m2:=value/m2$value*m2[.N, value], by=series_id]
+ggplot(data[series_id=="^GSPC"])  + geom_line(aes(x=date, y=adjusted_value_m2), color='blue')+ geom_line(aes(x=date, y=adjustedValue_constant), color='green')
 
 ```
 
@@ -87,24 +95,33 @@ data <- TranformToDropdawnData(data)
 #calculate growthRate and Growth Index
 #drawdown shows only decline, to see the full picture, use growthIndex. 
 CalculateLastMax(data)
+data[,`:=`(maxValue=NULL, dropdawn =NULL, dropdawnMVA =NULL, prevMax =NULL)]
 #Sharp decline on the chart, shows drawdown 15% of latest maximum
 ggplot(data[series_id=="^GSPC"]) +
-    geom_line(mapping = aes(x = date, y = dropdawnMVA), color = "green") + 
     geom_line(mapping = aes(x = date, y = growthIndex), color = "purple") 
 
 ```
 
+# Scale and display all data
 ```{r}
 scale_max_value <- data[type=="USA Economic/Percent", max(value, na.rm = T)]
 chart_data <- rbind(
-  data[type=="Price/USD", .(x = date, y = Scale_Max(m2adjusted_value, scale_max_value)), by=series_id], 
+  data[type=="Price/USD", .(x = date, y = Scale_Max(adjusted_value_m2, scale_max_value)), by=series_id], 
   data[type=="USA Economic/Percent", .(x = date, y = value), by=series_id]) 
 
 ggplot(chart_data, mapping = aes(x = x, y = y, color = series_id)) +
     geom_line() + labs(x = "Observation Date", y = "Rate", color = "Series")
 ```
 
-# TODO  - diff from percent/dollars/pips from ma200
+# Diff from percent/dollars/pips from ma200
+```{r m200}
+data[,valueMVA:=frollmean(value, 200, na.rm = T), by=series_id]
+data[,diffM200:=value / valueMVA, by=series_id]
+ggplot(data) +
+    geom_area(data = data[series_id=="^GSPC"], mapping = aes(x = date, y = diffM200-1)) +
+    geom_line(data = data[series_id=="FEDFUNDS"], mapping = aes(x = date, y = diffM200-1), color="red")
+```
+
 
 ## Saving Data
 We save our final cleaned result to file. Next document will explore the data.
@@ -118,7 +135,7 @@ We Scale the data and cross correlate SP500 and GOLD(XAUUSD)
 data <- fread("cleanedSeries.csv")
 
 scale_max_value <- data[series_id=="^GSPC"][.N, value]
-data[type=="Price/USD", y := Scale_Max(m2adjusted_value, scale_max_value), by=series_id]
+data[type=="Price/USD", y := Scale_Max(adjusted_value_m2, scale_max_value), by=series_id]
 data[type=="USA Economic/Percent", y := Scale_Max(value, scale_max_value), by=series_id]
 ccf(data[series_id=="^GSPC", y], data[series_id=="XAUUSD", y], lag.max=6000, na.action=na.pass)
 
