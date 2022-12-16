@@ -44,11 +44,12 @@ T10Y2Y[,value:=value + abs(min(value, na.rm = TRUE)) + 0.0001]
 inflation_rate <- fred_getSeries("FPCPITOTLZGUSA", observation_start, observation_end)
 bond10 <- fred_getSeries("IRLTLT01USM156N", observation_start, observation_end)
 dxy <- localStorage_getSeries("DXYUSD", observation_start, observation_end)
+vix <- localStorage_getSeries("VIXUSD", observation_start, observation_end)
 
 
 econ_parameters <- rbind(unemployment_rate, fed_ii, T10Y2Y, inflation_rate, bond10)
 econ_parameters[,date:=as.Date(date)]
-econ_parameters <- rbind(econ_parameters, dxy)
+econ_parameters <- rbind(econ_parameters, dxy, vix)
 
 econ_parameters[,type:="USA Economic/Percent"]
 ggplot(data = econ_parameters, mapping = aes(x = date, y = value, color = series_id)) +

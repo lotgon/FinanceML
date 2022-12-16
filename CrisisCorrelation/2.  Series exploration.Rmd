@@ -15,10 +15,11 @@ source("..\\common\\QuotesTransform.R")
 
 data <- fread("cleanedSeries.csv")
 targetName <- "XBRUSD"
-targetName <- "XAUUSD"
-targetName <- "^GSPC"
 targetName <- "^NDX"
 targetName <- "DXYUSD"
+targetName <- "VIXUSD"
+targetName <- "XAUUSD"
+targetName <- "^GSPC"
 
 ```
 
@@ -37,7 +38,7 @@ ccf(y1, x1, lag.max = 75, na.action = na.pass)
 ```
 
 
-# Analysing adjusted_value_m2 series for `r targetName`
+# Analysing crosscorrelation adjusted_value_m2( or value for econ parameters) series for `r targetName`
 
 Cross correlation will be the first exploration. Just some notes for analysing:
 - If correlation high/low for lag > 0, it means predictor forecast `target` for "Lag" days. `targetName` will change to the same side as predictor if corr is high (or opposite side if predictor is negative low)
@@ -56,17 +57,20 @@ for(curr_id in unique(data$series_id)){
 }
 ```
 
-# Analysing `r targetName` adjusted_value_m2 (adjusted for inflation) ~ diffM200(trend) series for
+# Analysing crosscorrelation `r targetName` adjusted_value_m2 ~ diffM200(trend) series
 
 ```{r m200}
 scale_max_value <- data[series_id==targetName][.N, diffM200]
 data[type=="Price/USD", x := Scale_Max(diffM200, scale_max_value), by=series_id]
 data[type=="USA Economic/Percent", x := Scale_Max(diffM200, scale_max_value), by=series_id]
+scale_max_value <- data[series_id==targetName][.N, adjusted_value_m2]
+data[type=="Price/USD", y := Scale_Max(adjusted_value_m2, scale_max_value), by=series_id]
+data[type=="USA Economic/Percent", y := Scale_Max(value, scale_max_value), by=series_id]
 
 for(curr_id in unique(data$series_id)){
-  c<-ccf(data[series_id==targetName, adjusted_value_m2], data[series_id==curr_id, x], lag.max=1000, na.action=na.pass, main=curr_id, plot=FALSE)
+  c<-ccf(data[series_id==targetName, y], data[series_id==curr_id, x], lag.max=1000, na.action=na.pass, main=curr_id, plot=FALSE)
   if( max(abs(c$acf)) > 0.2)
-    ccf(data[series_id==targetName, adjusted_value_m2], data[series_id==curr_id,x], lag.max=1000, na.action=na.pass, main=curr_id)
+    ccf(data[series_id==targetName, y], data[series_id==curr_id,x], lag.max=1000, na.action=na.pass, main=curr_id)
 }
 ```
 
@@ -77,7 +81,7 @@ ggplot(data[series_id==targetName]) +
 ```
 
 ```{r}
-scale_max_value <- data[series_id==targetName][.N, diffM200]
+scale_max_value <- data[series_id==targetName][.N, adjusted_value_m2]
 data[type=="Price/USD", x := Scale_Max(adjusted_value_m2, scale_max_value), by=series_id]
 data[type=="USA Economic/Percent", x := Scale_Max(value, scale_max_value), by=series_id]
 

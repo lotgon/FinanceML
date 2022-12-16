@@ -14,12 +14,12 @@ localStorage_getSeries <- function(series_id, startDate=ISOdate(1990, 1, 1, tz =
 TempConvertor <- function(){
   require(data.table)
   require(lubridate)
-  d <- fread(paste0("..\\data\\raw\\investing\\", "US Dollar Index Historical Data.csv"))
-  d2 <- fread(paste0("..\\data\\raw\\investing\\", "US Dollar Index Historical Data (1).csv"))
+  d <- fread(paste0("..\\data\\raw\\investing\\", "CBOE Volatility Index Historical Data.csv"))
+  d2 <- fread(paste0("..\\data\\raw\\investing\\", "CBOE Volatility Index Historical Data (1).csv"))
   d3 <- fread(paste0("..\\data\\raw\\investing\\", "US Dollar Index Historical Data (2).csv"))
-  d <- rbind(d, d2, d3)
+  d <- rbind(d, d2)
   d <- unique(d, by="Date")
   d[,Date:=parse_date_time(Date, 'mdy')]
   d<- d[order(Date)]
-  fwrite(d[,.(Date=as.Date(Date), `"Closing Value"`=Price)], paste0("..\\data\\raw\\investing\\", "DXY"))
+  fwrite(d[,.(Date=as.Date(Date), `"Closing Value"`=Price)], paste0("..\\data\\raw\\investing\\", "VIX"))
 }
