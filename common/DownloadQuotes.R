@@ -1,7 +1,7 @@
 require(data.table)
 require(lubridate)
 
-DownloadBars <- function(symbol, startDate, endDate, periodicity, type){
+tts_DownloadBars <- function(symbol, startDate, endDate, periodicity, type){
   server <- "ttlive.fxopen.com"
   login <- 100
   password <- "TTqfdeppmhDR"
@@ -14,21 +14,33 @@ DownloadBars <- function(symbol, startDate, endDate, periodicity, type){
 }
 
 #GetQuotes("EURCHF", startDate=ISOdate(2019, 1, 1, tz = "UTC"), endDate=ISOdate(2020, 1, 1, tz = "UTC"), periodicity="M1", type="BidAsk")
-GetQuotes <- function(symbol, startDate=ISOdate(2019, 1, 1, tz = "UTC"), endDate=ISOdate(2020, 1, 1, tz = "UTC"), periodicity="M1", type="Asks"){
+tts_GetQuotes <- function(symbol, startDate=ISOdate(2019, 1, 1, tz = "UTC"), endDate=ISOdate(2020, 1, 1, tz = "UTC"), periodicity="M1", type="Asks"){
   if( endDate > now(tzone="GMT") + 1 )
     endDate <- now(tzone="GMT") + 1
   
   if( type == "BidAsk"){
-    asks <- GetQuotes(symbol, startDate, endDate, periodicity, "Asks")
-    bids <- GetQuotes(symbol, startDate, endDate, periodicity, "Bids")
+    asks <- tts_GetQuotes(symbol, startDate, endDate, periodicity, "Asks")
+    bids <- tts_GetQuotes(symbol, startDate, endDate, periodicity, "Bids")
     return(merge(asks, bids, by="datetime", suffixes = c(".ask", ".bid")))
   }
   qdFileName <- paste0("..//.cache//", symbol, " ", substr(type, 0, 3), " ", periodicity, "  ", format(startDate, "%Y%m%d"), "  ", format(endDate, "%Y%m%d"), ".csv")
   if( !file.exists(qdFileName) ){
-    DownloadBars(symbol, startDate, endDate, periodicity, type)
+    tts_DownloadBars(symbol, startDate, endDate, periodicity, type)
   }
   d <- fread(qdFileName, col.names = c("datetime", "open", "close", "low", "high", "volume"))
-  d[,datetime:=ymd(datetime)]
+  parseF <- ymd_hms
+  if(periodicity == "D1")
+    parseF <- ymd
+  d[,datetime:=parseF(datetime)]
+  return(d)
+}
+
+tts_GetDailyData <- function(symbol, startDate=ISOdate(2010, 1, 1, tz = "UTC"), endDate){
+  bids <- tts_GetQuotes(symbol, startDate, endDate, periodicity="D1", type="Bids")
+  d<- bids[,.(date=datetime, value=close)]
+  period <- data.table(date = seq(startDate, endDate, 'days' ))
+  d <- d[period, on=.(date), roll=TRUE]
+  d[,series_id:=symbol]
   return(d)
 }
 

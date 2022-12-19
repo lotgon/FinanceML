@@ -15,6 +15,7 @@ source("..\\common\\QuantMod.R")
 source("..\\common\\fredRDownloader.R")
 source("..\\common\\QuotesTransform.R")
 source("..\\common\\localStorage.R")
+source("..\\common\\DownloadQuotes.R")
 ```
 
 
@@ -28,8 +29,9 @@ sp500 <- qmod_getSeries("^GSPC", observation_start, observation_end)
 ndx <- qmod_getSeries("^NDX", observation_start, observation_end)
 xau <- localStorage_getSeries("XAUUSD", observation_start, observation_end)
 xbr <- localStorage_getSeries("XBRUSD", observation_start, observation_end)
+btcusd <- tts_GetDailyData("BTCUSD", observation_start, observation_end)
 
-data <- rbind(sp500, xau, xbr, ndx)
+data <- rbind(sp500, xau, xbr, ndx, btcusd)
 data[,type:="Price/USD"]
 ```
 
@@ -81,9 +83,12 @@ ggplot(data[series_id=="^GSPC"])  + geom_line(aes(x=date, y=adjustedValue_consta
 However, in real life, inflation rate is not constant yearly. Lets try another adjustment based on M2.
 ```{r Price_M2}
 m2 <- fred_getSeries("M2SL", observation_start, observation_end)
-stopifnot( data[series_id=="^GSPC", date] == m2$date )
-data[, adjusted_value_m2:=value/m2$value*m2[.N, value], by=series_id]
-ggplot(data[series_id=="^GSPC"])  + geom_line(aes(x=date, y=adjusted_value_m2), color='blue')+ geom_line(aes(x=date, y=adjustedValue_constant), color='green')
+m2[,date:=as.Date(date)]
+#stopifnot( data[series_id=="^GSPC", date] == m2$date )
+data <- merge(data, m2[, .(date, value)], by="date", all.x = TRUE, all.y = FALSE, suffixes = c("", ".y"))
+setnames(data, "value.y", "m2")
+data[, adjusted_value_m2:=value/m2*data[.N, m2], by=series_id]
+ggplot(data[series_id=="XBRUSD"])  + geom_line(aes(x=date, y=adjusted_value_m2), color='blue')+ geom_line(aes(x=date, y=value), color='green')
 
 ```
 

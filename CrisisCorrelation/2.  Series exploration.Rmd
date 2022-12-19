@@ -20,6 +20,7 @@ targetName <- "DXYUSD"
 targetName <- "VIXUSD"
 targetName <- "XAUUSD"
 targetName <- "^GSPC"
+targetName <- "BTCUSD"
 
 ```
 
@@ -51,6 +52,7 @@ data[type=="USA Economic/Percent", y := Scale_Max(value, scale_max_value), by=se
 #for(curr_id in unique(data$series_id))
 #  ccf(data[series_id==targetName, y], data[series_id==curr_id, y], lag.max=2100, na.action=na.pass, #main=curr_id)
 for(curr_id in unique(data$series_id)){
+  print(curr_id)
   c<-ccf(data[series_id==targetName, y], data[series_id==curr_id, y], lag.max=2100, na.action=na.pass, main=curr_id, plot=FALSE)
   if( max(abs(c$acf)) > 0.2)
     ccf(data[series_id==targetName, y], data[series_id==curr_id, y], lag.max=2100, na.action=na.pass, main=curr_id)
