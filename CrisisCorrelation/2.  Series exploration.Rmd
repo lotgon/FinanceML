@@ -14,14 +14,14 @@ library(data.table);library(ggplot2)
 source("..\\common\\QuotesTransform.R")
 
 data <- fread("cleanedSeries.csv")
-targetName <- "XBRUSD"
+
 targetName <- "^NDX"
 targetName <- "DXYUSD"
 targetName <- "VIXUSD"
-targetName <- "XAUUSD"
 targetName <- "^GSPC"
 targetName <- "BTCUSD"
-
+targetName <- "XAUUSD"
+targetName <- "XBRUSD"
 ```
 
 ```{r chart}
