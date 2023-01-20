@@ -18,10 +18,11 @@ data <- fread("cleanedSeries.csv")
 targetName <- "^NDX"
 targetName <- "DXYUSD"
 targetName <- "VIXUSD"
-targetName <- "^GSPC"
-targetName <- "BTCUSD"
+
 targetName <- "XAUUSD"
 targetName <- "XBRUSD"
+targetName <- "^GSPC"
+targetName <- "BTCUSD"
 ```
 
 ```{r chart}

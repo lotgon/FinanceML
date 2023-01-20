@@ -32,8 +32,9 @@ xau <- rbind(xau, tts_GetDailyData("XAUUSD", xau[.N, date+1], observation_end))
 xbr <- localStorage_getSeries("XBRUSD", observation_start, observation_end)
 xbr <- rbind(xbr, tts_GetDailyData("XBRUSD", xbr[.N, date+1], observation_end))
 btcusd <- tts_GetDailyData("BTCUSD", observation_start, observation_end)
+tltetf <- tts_GetDailyData("TLT", observation_start, observation_end)
 
-data <- rbind(sp500, xau, xbr, ndx, btcusd)
+data <- rbind(sp500, xau, xbr, ndx, btcusd, tltetf)
 data[,type:="Price/USD"]
 ```
 
@@ -49,9 +50,10 @@ inflation_rate <- fred_getSeries("FPCPITOTLZGUSA", observation_start, observatio
 bond10 <- fred_getSeries("IRLTLT01USM156N", observation_start, observation_end)
 dxy <- localStorage_getSeries("DXYUSD", observation_start, observation_end)
 vix <- localStorage_getSeries("VIXUSD", observation_start, observation_end)
+junkBond <- fred_getSeries("BAMLH0A0HYM2EY", observation_start, observation_end)
 
 
-econ_parameters <- rbind(unemployment_rate, fed_ii, T10Y2Y, inflation_rate, bond10)
+econ_parameters <- rbind(unemployment_rate, fed_ii, T10Y2Y, inflation_rate, bond10, junkBond)
 econ_parameters[,date:=as.Date(date)]
 econ_parameters <- rbind(econ_parameters, dxy, vix)
 
