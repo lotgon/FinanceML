@@ -1,0 +1,30 @@
+---
+title: "4. GoldAnalysis"
+author: "Andrei Pazniak"
+format: html
+editor: visual
+---
+
+```{r init, echo=FALSE, include=FALSE}
+library(data.table);library(ggplot2);library(plotly)
+source("..\\common\\QuotesTransform.R")
+
+data <- fread("cleanedSeries.csv")
+
+targetName <- "XAUUSD"
+
+```
+
+### Gold Price normal and m2Inflation adjusted
+
+```{r tltchart}
+p <- ggplot(data[series_id==targetName])  + geom_line(aes(x=date, y=adjusted_value_m2, color='Adjusted price')) +geom_line(aes(x=date, y=value, color='Normal price')) + ggtitle("Gold Price normal and adjusted") + ylab("price") + xlab("date")
+ggplotly(p)
+```
+
+### GrowthIndex
+```{r growthindex}
+p <- ggplot(data[series_id==targetName]) +
+    geom_line(mapping = aes(x = date, y = growthIndex)) + ggtitle("Growth Index")
+ggplotly(p)
+```

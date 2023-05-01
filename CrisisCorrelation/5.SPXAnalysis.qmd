@@ -1,0 +1,115 @@
+---
+title: "5.SPXAnalysis"
+author: "Andrei Pazniak"
+format: html
+editor: visual
+---
+
+```{r init, echo=FALSE, include=FALSE}
+library(data.table);library(ggplot2);library(plotly)
+source("..\\common\\QuotesTransform.R")
+
+data <- fread("cleanedSeries.csv")
+
+targetName <- "^GSPC"
+
+```
+
+### TLT Price normal and adjusted
+
+```{r}
+p <- ggplot(data[series_id==targetName])  + geom_line(aes(x=date, y=adjusted_value_m2, color='Adjusted_M2 SP500')) +geom_line(aes(x=date, y=value, color="SP500")) + ggtitle("SP500 Price normal and adjusted") + ylab(targetName) + xlab("date")
+ggplotly(p)
+```
+
+### Correlation Treasuries and FEDFUNDS
+
+```{r}
+data[series_id==targetName, y := growthIndex]
+data[series_id=="FEDFUNDS", y := value/10]
+d <- data[series_id==targetName | series_id == "FEDFUNDS", .(series_id, date, y)]
+
+d2 <- d[series_id == "FEDFUNDS"]
+d2[, series_id:="FEDFUNDS_MA200"]
+d2[, y:= frollmean(y, 200, na.rm = T)]
+
+d <- rbind(d, d2)
+
+
+p <- ggplot(d, aes(x=date, y=y, color=series_id)) + geom_line() + ggtitle("SPX and FEDFUNDS") + ylab("growth Index/yield*0.1") + xlab("date")
+
+ggplotly(p)
+
+```
+
+### FedFund trends
+
+There are 3 states of FedFunds:
+
+1.  Trend Up (If diffM200 for fedfunds is greater than threshold)
+
+2.  Trend Down (If diffM200 for fedfunds is less than threshold)
+
+3.  Sideway (If diffM200 for abs(fedfunds) is less than threshold)
+
+To find threshold we make an assumption based on previous chart that 10% of time market in sideways and 90% in trend.
+
+```{r}
+fed_Sideways_Threshold <- quantile(d[, abs(valueMVA-value_fed)], probs=c(0.25), na.rm=TRUE)
+print(paste("Threshold level for classification sideway is difference between moving average 200 and real value", fed_Sideways_Threshold[[1]]))
+
+d_trend <- data[series_id == "FEDFUNDS", .(value, date, valueMVA)]
+d_trend[value - valueMVA>=fed_Sideways_Threshold[[1]], trend:="up"]
+d_trend[value - valueMVA<=-fed_Sideways_Threshold[[1]], trend:="down"]
+d_trend[is.na(trend), trend:="sideway"]
+
+d_sp <- data[series_id == targetName, .(value, date )]
+d <- merge(d_sp, d_trend[, .(date, value_fed=value, trend)], by="date", all.x=T, all.y = F)
+
+
+d_wide <- dcast(d, date  ~ trend, value.var = "value_fed")
+d_long <- melt(d_wide, id.vars = c("date"), variable.name = "trend", value.name = "value")
+
+p <- ggplot(d_long) + geom_line(aes(x=date, y=value, color=trend)) + geom_line(aes(x=date, y=value), alpha = 0.1) + ggtitle("Trends in FEDFUNDS") + ylab("growth Index/yield*0.1") + xlab("date")
+
+ggplotly(p)
+```
+
+After trend classification we can see SPX ~ FED in convienient chart
+
+
+```{r}
+d_wide <- dcast(d, date  ~ trend)
+d_long <- melt(d_wide, id.vars = c("date"), variable.name = "trend", value.name = "value")
+
+p <- ggplot(d_long) + geom_line(aes(x=date, y=value, color=trend)) + geom_line(aes(x=date, y=value), alpha = 0.1) + ggtitle("SPX and FEDFUNDS") + ylab("growth Index/yield*0.1") + xlab("date")
+
+ggplotly(p)
+```
+
+SP 500 growthIndex  with colors
+
+```{r}
+d_sp <- data[series_id == targetName, .(growthIndex, date )]
+d_growthIndex <- merge(d_sp, d_trend[, .(date, trend)], by="date", all.x=T, all.y = F)
+
+d_wide <- dcast(d_growthIndex, date  ~ trend, value.var = "growthIndex")
+d_long <- melt(d_wide, id.vars = c("date"), variable.name = "trend", value.name = "growthIndex")
+
+p <- ggplot(d_long) + geom_line(aes(x=date, y=growthIndex, color=trend)) + geom_line(aes(x=date, y=growthIndex), alpha = 0.1) + ggtitle("SPX and FEDFUNDS") + ylab("growth Index/yield*0.1") + xlab("date")
+
+ggplotly(p)
+```
+
+
+todo refactor tp russel2000 \### TLT, Junk bond and their ratio
+
+```{r bondyield}
+bond <- data[date>'1998-01-01'][series_id=="BAMLH0A0HYM2EY" | series_id=="IRLTLT01USM156N"]
+scaleFactor <- 10
+d <- data.table(date = unique(bond$date), value = scaleFactor*bond[series_id=="IRLTLT01USM156N", value]/ bond[series_id=="BAMLH0A0HYM2EY", value], series_id = "tlt2junk", type="USA Economic/Percent")
+d <- rbind(bond, d, fill=TRUE)
+p <- ggplot(d, aes(x=date, y=value, color=series_id))  + geom_line() + geom_hline(yintercept = 2, color="blue") + geom_hline(yintercept = 5, color="blue") + ggtitle("TLT, Junk bond and their ratio") + ylab("yield/ratio") + xlab("date")
+ggplotly(p)
+
+```

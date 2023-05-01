@@ -1,7 +1,7 @@
 #series: data.table with value column
 TranformToDropdawnData<-function(series){
 #  series_ids <- series[,unique(series_id)]
-  series[,maxValue:=purrr::accumulate(value, max, na.rm=T), by=series_id]
+  suppressWarnings({series[,maxValue:=purrr::accumulate(value, max, na.rm=T), by=series_id]})
   series[,dropdawn:=value/maxValue, by=series_id]
   series[,dropdawnMVA:=frollmean(dropdawn, 7), by=series_id]
   series[dropdawnMVA==-Inf, dropdawnMVA:=NA]
