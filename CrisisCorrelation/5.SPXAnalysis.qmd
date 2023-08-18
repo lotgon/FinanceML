@@ -82,7 +82,7 @@ After trend classification we can see SPX ~ FED in convienient chart
 d_wide <- dcast(d, date  ~ trend)
 d_long <- melt(d_wide, id.vars = c("date"), variable.name = "trend", value.name = "value")
 
-p <- ggplot(d_long) + geom_line(aes(x=date, y=value, color=trend)) + geom_line(aes(x=date, y=value), alpha = 0.1) + ggtitle("SPX and FEDFUNDS") + ylab("growth Index/yield*0.1") + xlab("date")
+p <- ggplot(d_long) + geom_line(aes(x=date, y=value, color=trend)) + geom_line(aes(x=date, y=value), alpha = 0.1) + ggtitle("SPX and FEDFUNDS") + ylab("price") + xlab("date")
 
 ggplotly(p)
 ```
@@ -96,7 +96,7 @@ d_growthIndex <- merge(d_sp, d_trend[, .(date, trend)], by="date", all.x=T, all.
 d_wide <- dcast(d_growthIndex, date  ~ trend, value.var = "growthIndex")
 d_long <- melt(d_wide, id.vars = c("date"), variable.name = "trend", value.name = "growthIndex")
 
-p <- ggplot(d_long) + geom_line(aes(x=date, y=growthIndex, color=trend)) + geom_line(aes(x=date, y=growthIndex), alpha = 0.1) + ggtitle("SPX and FEDFUNDS") + ylab("growth Index/yield*0.1") + xlab("date")
+p <- ggplot(d_long) + geom_line(aes(x=date, y=growthIndex, color=trend)) + geom_line(aes(x=date, y=growthIndex), alpha = 0.1) + ggtitle("SPX drawdown and FEDFUNDS") + ylab("drawdown") + xlab("date")
 
 ggplotly(p)
 ```
