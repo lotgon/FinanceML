@@ -75,8 +75,7 @@ p <- ggplot(d_long) + geom_line(aes(x=date, y=value, color=trend)) + geom_line(a
 ggplotly(p)
 ```
 
-After trend classification we can see SPX ~ FED in convienient chart
-
+After trend classification we can see SPX \~ FED in convienient chart
 
 ```{r}
 d_wide <- dcast(d, date  ~ trend)
@@ -87,7 +86,7 @@ p <- ggplot(d_long) + geom_line(aes(x=date, y=value, color=trend)) + geom_line(a
 ggplotly(p)
 ```
 
-SP 500 growthIndex  with colors
+SP 500 growthIndex with colors
 
 ```{r}
 d_sp <- data[series_id == targetName, .(growthIndex, date )]
@@ -100,7 +99,6 @@ p <- ggplot(d_long) + geom_line(aes(x=date, y=growthIndex, color=trend)) + geom_
 
 ggplotly(p)
 ```
-
 
 todo refactor tp russel2000 \### TLT, Junk bond and their ratio
 

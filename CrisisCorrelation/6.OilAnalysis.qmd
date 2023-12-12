@@ -1,0 +1,55 @@
+---
+title: "6.OIL"
+author: "AP"
+format: html
+editor: visual
+---
+
+```{r init, echo=FALSE, include=FALSE}
+library(data.table);library(ggplot2);library(plotly);library(lubridate)
+source("..\\common\\QuotesTransform.R")
+source("..\\common\\SmartInvest.R")
+
+data <- fread("cleanedSeries.csv")
+
+targetName <- "XBRUSD"
+
+```
+
+### Gold Price normal and m2Inflation adjusted
+
+```{r tltchart}
+p <- ggplot(data[series_id==targetName])  + geom_line(aes(x=date, y=adjusted_value_m2, color='Adjusted price')) +geom_line(aes(x=date, y=value, color='Normal price')) + ggtitle("Oil Price normal and adjusted") + ylab("price") + xlab("date")
+ggplotly(p)
+```
+
+```{r tltchart}
+p <- ggplot(data[date>"1995-01-01"][series_id==targetName | series_id=="^GSPC"])  + geom_line(aes(x=date, y=value,  color = series_id)) + ggtitle("Oil Price normal and SPX") + ylab("price") + xlab("date")
+ggplotly(p)
+```
+```{r test}
+testData <- data[series_id==targetName, .(date, price=adjusted_value_m2)][!is.na(price)]
+testData[,roll3650:=frollmean(price, 3650)]
+ggplot(testData, aes(x=date, y=price)) + geom_line() + geom_line(aes(y=roll3650))
+```
+We make an hypotesis that histogram of the next decade has linear correlation with previous decade. Factor is ~ 30%
+```{r hist}
+decadeData <- data[series_id==targetName, .(date, price=value)][!is.na(price)][date>='1990-01-01']
+decadeData[,decade:=cut(year(date), c(1990, 1999, 2009, 2019, 2029), include.lowest = T)]
+decadeData[,.(quantile10=quantile(price, c(0.1)), quantile50=quantile(price, c(0.5))), by=decade]
+
+ggplot(decadeData, aes(x=price)) + geom_histogram() + geom_density(alpha=2, fill = "lightblue") + facet_grid(decade~.)
+
+```
+
+```{r smartinvest}
+#simpleData <- data[series_id==targetName, .(date, price=value)][!is.na(price)][date>='2000-01-01'][date<='2010-01-01']
+simpleData <- data[series_id==targetName, .(date, price=value)][!is.na(price)][date>='2010-01-01'][date<='2020-01-01']
+summary(simpleData)
+iData <- EmulateInvestment(simpleData, reqPrices = seq(40, 70, 10), reqVolumes=3:0)
+iData[backtestVolume!=0]
+totalProfit <- iData[,sum(backtestProfit) - sum(backtestSwaps)*0.03*0.01]
+ggplot(iData, aes(x=date, y=price)) + geom_line() +
+    geom_point(data = iData[backtestVolume>0], mapping  = aes(x=date, y=price, colour='buy'), size=3) +
+    geom_point(data = iData[backtestVolume<0], mapping  = aes(x=date, y=price, colour='sell'), size=3)   
+```
