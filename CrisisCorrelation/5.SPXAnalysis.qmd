@@ -55,7 +55,7 @@ There are 3 states of FedFunds:
 To find threshold we make an assumption based on previous chart that 10% of time market in sideways and 90% in trend.
 
 ```{r}
-fed_Sideways_Threshold <- quantile(d[, abs(valueMVA-value_fed)], probs=c(0.25), na.rm=TRUE)
+fed_Sideways_Threshold <- quantile(data[series_id == "FEDFUNDS", abs(valueMVA-value)], probs=c(0.25), na.rm=TRUE)
 print(paste("Threshold level for classification sideway is difference between moving average 200 and real value", fed_Sideways_Threshold[[1]]))
 
 d_trend <- data[series_id == "FEDFUNDS", .(value, date, valueMVA)]
