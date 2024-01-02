@@ -111,3 +111,28 @@ p <- ggplot(d, aes(x=date, y=value, color=series_id))  + geom_line() + geom_hlin
 ggplotly(p)
 
 ```
+
+Should we make 5 year investment to SPX when price is greater than MA200 or lower ? 
+```{r scatterplot}
+d<- data[series_id==targetName,]
+#profit in 5 years
+d[,profit_5y:= shift(value, 365*5, type="lead")/value]
+
+mean_random <- d[, mean(profit_5y, na.rm=TRUE)]
+mean_belowMA200 <- d[diffM200<0.9, mean(profit_5y, na.rm=TRUE)]
+#AB testing to be sure that means are different
+t.test(d[diffM200<0.9, profit_5y], d[,profit_5y])
+#just for research
+ggplot(d, aes(x=diffM200, y=profit_5y)) + geom_point() + geom_hline(yintercept=1, color="red") + geom_vline(xintercept = 1, color="green") + ggtitle("Scatter plot 5Y profit ~ ma200 diff") 
+#comparison of buying instrument below MA200 on 10% or in any time 
+ggplot() + 
+  geom_density(data = d, aes(x = profit_5y, fill = "r"), alpha = 0.3) +
+  geom_density(data = d[diffM200<0.9], aes(x = profit_5y, fill = "b"), alpha = 0.3) +
+  scale_colour_manual(name ="Comparison", values = c("r" = "red", "b" = "blue"), labels=c("b" = "Price < 0.9*MA200", "r" = "Random buying")) +
+  scale_fill_manual(name ="Comparison", values = c("r" = "red", "b" = "blue"), labels=c("b" = "Price < 0.9*MA200", "r" = "Random buying")) +
+  geom_vline(xintercept = 1, color="black") +
+  geom_vline(xintercept = mean_random, color="red", ) +  
+  geom_vline(xintercept = mean_belowMA200, color="blue") +
+  annotate("text", x=mean_random, y=0.25, label="Mean Random Buying", size=3, color="red", angle = 90) + 
+  annotate("text", x=mean_belowMA200, y=0.25, label="Mean BelowMA200 Buying", size=3, color="blue", angle = 90) 
+```
