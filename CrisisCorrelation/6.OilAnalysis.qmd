@@ -42,6 +42,21 @@ ggplot(decadeData, aes(x=price)) + geom_histogram() + geom_density(alpha=2, fill
 
 ```
 
+```{r improvedhist}
+d <- data[series_id==targetName,.(date, series_id, value)]
+d <- TranformToDropdawnData(d, columnName = "value")
+alpha <- 0.1
+TranformTo_LastMax(d, columnName = "value", threshold=1-alpha)
+d[,`:=`(maxValue=NULL, dropdawn =NULL, dropdawnMVA =NULL, prevMax =NULL)]
+wavesCuts <- as.POSIXct(c(d[1, date], d[growthIndex<=1-alpha & shift(growthIndex, 1)>1, date], d[.N, date]))
+wavesData <- d[!is.na(value)][,waveId:=cut(as.POSIXct(date), breaks = wavesCuts, include.lowest = T)] 
+wavesData[,index:=seq(.N), by=waveId]
+wavesData[,dailyGrowth:=value/shift(value), by=waveId]
+wavesData[!is.na(dailyGrowth),percentPrice:=cumprod(dailyGrowth), by=waveId]
+
+ggplot(wavesData, aes(x=index, y=percentPrice, group=waveId, color=waveId)) + geom_line()
+```
+
 ```{r smartinvest}
 #simpleData <- data[series_id==targetName, .(date, price=value)][!is.na(price)][date>='2000-01-01'][date<='2010-01-01']
 simpleData <- data[series_id==targetName, .(date, price=value)][!is.na(price)][date>='2010-01-01'][date<='2020-01-01']

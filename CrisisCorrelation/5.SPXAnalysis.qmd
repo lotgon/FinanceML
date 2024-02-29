@@ -118,21 +118,49 @@ d<- data[series_id==targetName,]
 #profit in 5 years
 d[,profit_5y:= shift(value, 365*5, type="lead")/value]
 
+dd <- 0.1
+
 mean_random <- d[, mean(profit_5y, na.rm=TRUE)]
-mean_belowMA200 <- d[diffM200<0.9, mean(profit_5y, na.rm=TRUE)]
+mean_belowMA200 <- d[diffM200<1-dd, mean(profit_5y, na.rm=TRUE)]
 #AB testing to be sure that means are different
-t.test(d[diffM200<0.9, profit_5y], d[,profit_5y])
+tt_result <- t.test(d[diffM200<1-dd, profit_5y], d[,profit_5y])
+```
+
+Analyse profit in next 5 years if buying when MA200 drawdown less then `dd*100`%. 
+Confidence Interval is `tt_result$conf.int`
+
+```{r ms200chart}
 #just for research
-ggplot(d, aes(x=diffM200, y=profit_5y)) + geom_point() + geom_hline(yintercept=1, color="red") + geom_vline(xintercept = 1, color="green") + ggtitle("Scatter plot 5Y profit ~ ma200 diff") 
+#ggplot(d, aes(x=diffM200, y=profit_5y)) + geom_point() + geom_hline(yintercept=1, color="red") + #geom_vline(xintercept = 1, color="green") + ggtitle("Scatter plot 5Y profit ~ ma200 diff") 
+
+#chart to understand how often situation with this condition
+ggplot(d[diffM200<1-dd], aes(x=date, y=profit_5y)) + geom_col()
 #comparison of buying instrument below MA200 on 10% or in any time 
 ggplot() + 
   geom_density(data = d, aes(x = profit_5y, fill = "r"), alpha = 0.3) +
-  geom_density(data = d[diffM200<0.9], aes(x = profit_5y, fill = "b"), alpha = 0.3) +
-  scale_colour_manual(name ="Comparison", values = c("r" = "red", "b" = "blue"), labels=c("b" = "Price < 0.9*MA200", "r" = "Random buying")) +
-  scale_fill_manual(name ="Comparison", values = c("r" = "red", "b" = "blue"), labels=c("b" = "Price < 0.9*MA200", "r" = "Random buying")) +
+  geom_density(data = d[diffM200<1-dd], aes(x = profit_5y, fill = "b"), alpha = 0.3) +
+  scale_colour_manual(name ="Comparison", values = c("r" = "red", "b" = "blue"), labels=c("b" = "Price < 0.x*MA200", "r" = "Random buying")) +
+  scale_fill_manual(name ="Comparison", values = c("r" = "red", "b" = "blue"), labels=c("b" = "Price < 0.x*MA200", "r" = "Random buying")) +
   geom_vline(xintercept = 1, color="black") +
   geom_vline(xintercept = mean_random, color="red", ) +  
   geom_vline(xintercept = mean_belowMA200, color="blue") +
   annotate("text", x=mean_random, y=0.25, label="Mean Random Buying", size=3, color="red", angle = 90) + 
-  annotate("text", x=mean_belowMA200, y=0.25, label="Mean BelowMA200 Buying", size=3, color="blue", angle = 90) 
+  annotate("text", x=mean_belowMA200, y=0.25, label="Mean BelowMA200 Buying", size=3, color="blue", angle = 90) +
+  ylab("density")
+```
+Divide the GrowthChart into multiple waves, where each wave begins following 20% decline from an all-time high.
+
+```{r improvedhist}
+d <- data[series_id==targetName,.(date, series_id, value)]
+d <- TranformToDropdawnData(d, columnName = "value")
+alpha <- 0.2
+TranformTo_LastMax(d, columnName = "value", threshold=1-alpha)
+d[,`:=`(maxValue=NULL, dropdawn =NULL, dropdawnMVA =NULL, prevMax =NULL)]
+wavesCuts <- as.POSIXct(c(d[1, date], d[growthIndex<=1-alpha & shift(growthIndex, 1)>1, date], d[.N, date]))
+wavesData <- d[!is.na(value)][,waveId:=cut(as.POSIXct(date), breaks = wavesCuts, include.lowest = T)] 
+wavesData[,index:=seq(.N), by=waveId]
+wavesData[,dailyGrowth:=value/shift(value), by=waveId]
+wavesData[!is.na(dailyGrowth),percentPrice:=cumprod(dailyGrowth), by=waveId]
+
+ggplot(wavesData, aes(x=index, y=percentPrice, group=waveId, color=waveId)) + geom_line()
 ```

@@ -101,12 +101,12 @@ To avoid inflation noise and normalizing, we will tranform SP500 rates to dropda
 
 ```{r}
 #to observe period and magnitude of crisises we tranform price to drawdowns
-data <- TranformToDropdawnData(data, columnName = "adjusted_value_m2")
+data <- TranformToDropdawnData(data, columnName = "value")#columnName = "adjusted_value_m2")
 #calculate growthRate and Growth Index
 #drawdown shows only decline, to see the full picture, use growthIndex. 
-TranformTo_LastMax(data, columnName = "adjusted_value_m2")
+TranformTo_LastMax(data, columnName = "value")#columnName = "adjusted_value_m2")
 data[,`:=`(maxValue=NULL, dropdawn =NULL, dropdawnMVA =NULL, prevMax =NULL)]
-#Sharp decline on the chart, shows drawdown 15% of latest maximum
+#Sharp decline on the chart, shows drawdown 10% of latest maximum
 ggplot(data[series_id=="^GSPC"]) +
     geom_line(mapping = aes(x = date, y = growthIndex), color = "purple") 
 
